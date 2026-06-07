@@ -41,7 +41,7 @@ const WithdrawalPage = () => {
 
     // 1. Client-side protection barrier logic
     if (withdrawalAmount <= 0) {
-      showToast("Enter a valid amount greater than 0.");
+      showToast("Please enter a valid amount greater than 0.");
       return;
     }
 
