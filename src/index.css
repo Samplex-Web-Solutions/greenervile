@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Add a smooth background for that premium feel */
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+:root {
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  scroll-behavior: smooth;
+  text-rendering: optimizeLegibility;
+}
+
+html{
+  overflow-x: hidden;
+}
