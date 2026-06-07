@@ -25,7 +25,6 @@ import WithdrawalPage from './Pages/User/Withdrawal';
 //Admin pages
 import VilePanel from './Pages/CMS/VilePanel';
 import ManageUsers from './Pages/CMS/ManageUsers';
-import AddFunds from './Pages/CMS/AddFunds';
 import TransactionHistory from './Pages/CMS/TransactionHistory';
 import Settings from './Pages/CMS/AccountSettings';
 import Market from './Pages/CMS/Market';
@@ -62,7 +61,6 @@ function App() {
               <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
                 <Route path="/panel/*" element={<VilePanel />} />
                 <Route path="/panel/users" element={<ManageUsers />} />
-                <Route path="/panel/addfunds/" element={<AddFunds />} />
                 <Route path="/panel/addhistory/" element={<TransactionHistory />} />
                 <Route path="/panel/settings" element={<Settings />} />
                 <Route path='/panel/market' element={<Market />} />

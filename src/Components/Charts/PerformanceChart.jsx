@@ -10,7 +10,6 @@ import {
 } from 'recharts';
 
 const PerformanceChart = ({ title, data }) => {
-  // Safe helper to format Y-Axis digits cleanly
   const formatYAxis = (tickItem) => {
     return `$${(tickItem / 1000).toFixed(0)}k`;
   };
@@ -21,11 +20,7 @@ const PerformanceChart = ({ title, data }) => {
         <h3 className="text-base font-black text-slate-900 tracking-tight">{title}</h3>
         <p className="text-[11px] font-medium text-slate-400">Live system performance trajectory logs</p>
       </div>
-
-      {/* CRITICAL FIX: ResponsiveContainer requires a fixed height (e.g. height={300}) 
-        and an explicit parent container style when nested inside motion.div 
-        to prevent collapsing to 0px width.
-      */}
+      
       <div className="w-full h-[300px]" style={{ minWidth: '100%' }}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart

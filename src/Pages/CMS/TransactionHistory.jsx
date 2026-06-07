@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { adminService } from '../../Services/adminServices'; // Adjust paths as needed
+import { adminService } from '../../Services/adminServices';
 import { useToast } from '../../Components/Context/ToastContext';
 import { Calendar, DollarSign, User, PlusCircle, Loader2 } from 'lucide-react';
 

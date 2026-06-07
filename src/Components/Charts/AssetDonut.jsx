@@ -2,7 +2,6 @@ import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 const AssetDonut = ({ assets = [], totalValue = "$0.00" }) => {
-  // Map Tailwind utility style handles directly to theme Hex constants for the engine
   const colorMap = {
     'bg-emerald-500': '#10b981',
     'bg-blue-500': '#3b82f6',
@@ -10,10 +9,8 @@ const AssetDonut = ({ assets = [], totalValue = "$0.00" }) => {
     'bg-slate-300': '#cbd5e1'
   };
 
-  // Format dataset properly for Recharts engine
   const data = assets.map(asset => ({
     name: asset.name,
-    // Using regex replace to safely drop any strings or "%" markers so parseInt handles raw numeric values
     value: parseInt(asset.percentage?.toString().replace(/[^0-9]/g, '')) || 0,
     color: colorMap[asset.color] || '#cbd5e1'
   }));

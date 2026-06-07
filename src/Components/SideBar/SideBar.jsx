@@ -44,7 +44,6 @@ const Sidebar = () => {
       { name: 'Admin Overview', path: '/panel', icon: ShieldCheck },
       { name: 'Create Users', path: '/panel/users', icon: Users },
       { name: 'Approve Transactions', path: '/panel/reviews', icon: CheckSquare},
-      { name: 'Add Funds', path: '/panel/addfunds', icon: Banknote },
       { name: 'Deposit Settings', path: '/panel/deposit-settings', icon: Construction},
       { name: 'Market Settings', path: '/panel/market', icon: Construction },
       { name: 'Add logs', path: '/panel/addhistory', icon: History },
