@@ -1,57 +1,56 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '../../Components/Context/ToastContext';
+import { useAuth } from '../../Components/Context/Authcontext';
+import { supabase } from '../../SuperBase/superbaseClient';
+import { userService } from '../../Services/userService';
 import { 
-  CreditCard, Landmark, Bitcoin, ShieldCheck, 
+  Landmark, Bitcoin, ShieldCheck, 
   ArrowRight, CheckCircle2, Copy, Info, 
-  ChevronLeft, Loader2, Timer, Building, Construction,
-  Coins
+  ChevronLeft, Loader2, Timer, Coins
 } from 'lucide-react';
 
 const Deposit = () => {
   const { showToast } = useToast();
+  const { user } = useAuth(); // Gather investor account parameters
   const [step, setStep] = useState(1);
-  const [method, setMethod] = useState(null); // 'bank', 'card', 'crypto'
+  const [method, setMethod] = useState(null); // 'bank' or 'crypto'
   const [cryptoType, setCryptoType] = useState(null); // 'erc20', 'btc', 'trc20'
   const [amount, setAmount] = useState('');
   const [timeLeft, setTimeLeft] = useState(1800);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeAddress, setActiveAddress] = useState('');
-  const [bankDetails, setBankDetails] = useState({ acc: '', swift: '', routing: '' });
+  
+  // Real dynamic admin configurations states
+  const [adminSettings, setAdminSettings] = useState(null);
+  const [loadingSettings, setLoadingSettings] = useState(true);
+
+  // Fetch true admin coordinates directly from the database row
+  useEffect(() => {
+    const fetchGatewaySettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('deposit_settings')
+          .select('*')
+          .eq('id', 1)
+          .single();
+
+        if (error) throw error;
+        setAdminSettings(data);
+      } catch (err) {
+        console.error("Error reading admin deposit settings:", err.message);
+        showToast("Failed loading current gateway credentials", "error");
+      } finally {
+        setLoadingSettings(false);
+      }
+    };
+    fetchGatewaySettings();
+  }, []);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
-
-  // Address Generation Logic
-  useEffect(() => {
-    if (step === 3) {
-      const chars = '0123456789abcdefABCDEF';
-      const btcChars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-      let addr = '';
-
-      if (method === 'crypto') {
-        if (cryptoType === 'erc20') {
-          addr = '0x';
-          for (let i = 0; i < 40; i++) addr += chars[Math.floor(Math.random() * chars.length)];
-        } else if (cryptoType === 'trc20') {
-          addr = 'T';
-          for (let i = 0; i < 33; i++) addr += chars[Math.floor(Math.random() * chars.length)];
-        } else if (cryptoType === 'btc') {
-          addr = Math.random() > 0.5 ? '1' : '3';
-          for (let i = 0; i < 32; i++) addr += btcChars[Math.floor(Math.random() * btcChars.length)];
-        }
-        setActiveAddress(addr);
-      }
-
-      // Bank details generation remains same
-      const accNum = Math.floor(1000000000 + Math.random() * 9000000000);
-      const routing = Math.floor(100000000 + Math.random() * 900000000);
-      setBankDetails({ acc: accNum, swift: `PVCA${Math.floor(100 + Math.random() * 899)}US6L`, routing });
-    }
-  }, [step, cryptoType, method]);
 
   useEffect(() => {
     if (step === 3 && timeLeft > 0) {
@@ -61,19 +60,41 @@ const Deposit = () => {
   }, [step, timeLeft]);
 
   const handleCopy = (text, label) => {
+    if (!text) return;
     navigator.clipboard.writeText(text);
-    showToast(`${label} copied`, "success");
+    showToast(`${label} copied to clipboard`, "success");
   };
 
-  const handleFinalConfirm = () => {
+  const handleFinalConfirm = async () => {
+    if (!amount || Number(amount) < 10000) return;
     setIsProcessing(true);
-    setTimeout(() => {
+
+    // Determine target tracking label matching admin processing functions
+    const derivedType = method === 'crypto' ? `invest_pending_crypto_${cryptoType}` : 'deposit';
+
+    try {
+      // Commit pending row onto your transactions database schema
+      const res = await userService.requestDeposit(
+        user?.id, 
+        amount, 
+        method === 'crypto' ? `USDT_${cryptoType.toUpperCase()}` : 'BANK_WIRE'
+      );
+
+      if (res.success) {
+        showToast(`Audit initiated for $${Number(amount).toLocaleString()} deposit`, "success");
+        setStep(1);
+        setAmount('');
+        setCryptoType(null);
+        setMethod(null);
+        setTimeLeft(1800); // Reset clock countdown
+      } else {
+        showToast(res.error || "Transaction compilation encountered an issue.", "error");
+      }
+    } catch (err) {
+      showToast("Network execution failure.", "error");
+    } finally {
       setIsProcessing(false);
-      showToast(`Audit initiated for $${Number(amount).toLocaleString()} deposit`, "success");
-      setStep(1);
-      setAmount('');
-      setCryptoType(null);
-    }, 3000);
+    }
   };
 
   const cryptoOptions = [
@@ -81,6 +102,26 @@ const Deposit = () => {
     { id: 'btc', name: 'Bitcoin', network: 'BTC Network', icon: Bitcoin, color: 'text-amber-500' },
     { id: 'trc20', name: 'USDT', network: 'Tron (TRC20)', icon: Coins, color: 'text-emerald-500' },
   ];
+
+  // Map chosen variant strings directly onto verified admin parameters safely
+  const getActiveCryptoAddress = () => {
+    if (!adminSettings) return 'Loading parameters...';
+    if (cryptoType === 'erc20') return adminSettings.usdt_erc20_address;
+    if (cryptoType === 'trc20') return adminSettings.usdt_trc20_address;
+    if (cryptoType === 'btc') return adminSettings.btc_address;
+    return '';
+  };
+
+  if (loadingSettings) {
+    return (
+      <div className="p-4 md:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-2">
+          <Loader2 className="animate-spin text-slate-900" size={28} />
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Synchronizing Payment Channels...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-8 lg:p-12 bg-slate-50 min-h-screen flex justify-center font-sans">
@@ -115,23 +156,11 @@ const Deposit = () => {
                 <div className="flex items-center space-x-4">
                   <div className="p-4 rounded-2xl bg-blue-50 text-blue-600"><Landmark size={20} /></div>
                   <div className="text-left">
-                    <p className="text-base font-black text-slate-900">Bank Transfer</p>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">California Pacific Trust</p>
+                    <p className="text-base font-black text-slate-900">Bank Wire Transfer</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{adminSettings?.bank_name || 'Verified Corporate Account'}</p>
                   </div>
                 </div>
                 <ChevronLeft size={18} className="rotate-180 text-slate-300" />
-              </button>
-
-              {/* Maintenance Card */}
-              <button disabled className="w-full bg-slate-50 p-6 rounded-[28px] border border-slate-100 flex items-center justify-between opacity-60 cursor-not-allowed">
-                <div className="flex items-center space-x-4">
-                  <div className="p-4 rounded-2xl bg-slate-100 text-slate-300"><Construction size={20} /></div>
-                  <div className="text-left">
-                    <p className="text-base font-black text-slate-400">Card Payment</p>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">System Update</p>
-                  </div>
-                </div>
-                <span className="text-[8px] font-black bg-rose-100 text-rose-600 px-2 py-1 rounded-md uppercase tracking-widest">Maintenance</span>
               </button>
 
               {/* Crypto (Multi-Option) */}
@@ -139,8 +168,8 @@ const Deposit = () => {
                 <div className="flex items-center space-x-4 mb-6">
                   <div className="p-4 rounded-2xl bg-amber-50 text-amber-500"><Bitcoin size={20} /></div>
                   <div className="text-left">
-                    <p className="text-base font-black text-slate-900">Cryptocurrency</p>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Auto-settlement enabled</p>
+                    <p className="text-base font-black text-slate-900">Cryptocurrency Settlement</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Instant decentralized validation</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -157,8 +186,6 @@ const Deposit = () => {
                   ))}
                 </div>
               </div>
-
-              
             </motion.div>
           )}
 
@@ -198,28 +225,42 @@ const Deposit = () => {
                   </div>
                 </div>
 
-                {/* BANK TRANSFER VIEW */}
-                {method === 'bank' && (
+                {/* REAL BANK TRANSFER VIEW */}
+                {method === 'bank' && adminSettings && (
                   <div className="bg-white/5 border border-white/10 p-5 rounded-3xl space-y-4">
                     <div className="flex justify-between items-center border-b border-white/5 pb-3">
                       <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Bank Name</p>
-                      <p className="text-[10px] font-black text-white">Pacific Venture Bank, CA</p>
+                      <p className="text-[10px] font-black text-white">{adminSettings.bank_name}</p>
                     </div>
                     <div className="flex justify-between items-center border-b border-white/5 pb-3">
                       <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Account Name</p>
-                      <p className="text-xs font-black text-emerald-400">Greener Vile</p>
+                      <p className="text-xs font-black text-emerald-400">{adminSettings.account_name}</p>
                     </div>
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center border-b border-white/5 pb-3">
                       <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Account No.</p>
                       <div className="flex items-center gap-2">
-                        <p className="text-xs font-mono font-bold">{bankDetails.acc}</p>
-                        <button onClick={() => handleCopy(bankDetails.acc, "Account")} className="p-1.5 hover:bg-white/10 rounded-lg"><Copy size={12}/></button>
+                        <p className="text-xs font-mono font-bold">{adminSettings.account_no}</p>
+                        <button onClick={() => handleCopy(adminSettings.account_no, "Account Number")} className="p-1.5 hover:bg-white/10 rounded-lg"><Copy size={12}/></button>
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-white/5 pb-3">
+                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Routing No.</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-mono font-bold">{adminSettings.routing_no}</p>
+                        <button onClick={() => handleCopy(adminSettings.routing_no, "Routing Number")} className="p-1.5 hover:bg-white/10 rounded-lg"><Copy size={12}/></button>
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">SWIFT / BIC</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-mono font-bold">{adminSettings.swift_code}</p>
+                        <button onClick={() => handleCopy(adminSettings.swift_code, "SWIFT Code")} className="p-1.5 hover:bg-white/10 rounded-lg"><Copy size={12}/></button>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* CRYPTO VIEW */}
+                {/* REAL CRYPTO VIEW */}
                 {method === 'crypto' && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between px-2">
@@ -230,8 +271,15 @@ const Deposit = () => {
                     <div className="bg-white/5 border border-white/10 p-5 rounded-3xl">
                       <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-3">Deposit Address</p>
                       <div className="flex items-center justify-between gap-4">
-                        <code className="text-[10px] font-mono text-emerald-400 break-all leading-tight">{activeAddress}</code>
-                        <button onClick={() => handleCopy(activeAddress, "Address")} className="p-3 bg-white/10 rounded-xl hover:bg-white/20"><Copy size={14} /></button>
+                        <code className="text-[10px] font-mono text-emerald-400 break-all leading-tight">
+                          {getActiveCryptoAddress()}
+                        </code>
+                        <button 
+                          onClick={() => handleCopy(getActiveCryptoAddress(), `${cryptoType.toUpperCase()} Address`)} 
+                          className="p-3 bg-white/10 rounded-xl hover:bg-white/20 shrink-0"
+                        >
+                          <Copy size={14} />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -251,7 +299,7 @@ const Deposit = () => {
 
         <div className="mt-8 text-center">
           <p className="text-[8px] font-black uppercase tracking-[0.3em] text-slate-300 flex items-center justify-center gap-2">
-            <ShieldCheck size={12} className="text-emerald-500" /> Greener Vile Institutional Terminal
+            <ShieldCheck size={12} className="text-emerald-500" /> Institutional Settlement Terminal
           </p>
         </div>
       </div>

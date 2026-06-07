@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../Components/Context/Authcontext';
+import { adminService } from '../../Services/adminServices';
 import { motion } from 'framer-motion';
 import {
   Users,
@@ -7,7 +8,8 @@ import {
   Activity,
   TrendingUp,
   ArrowUpRight,
-  MoreVertical
+  MoreVertical,
+  Loader2
 } from 'lucide-react';
 
 import PerformanceChart from '../../Components/Charts/PerformanceChart';
@@ -15,6 +17,106 @@ import AssetDonut from '../../Components/Charts/AssetDonut';
 
 const AdminOverview = () => {
   const { profile } = useAuth();
+  const [metrics, setMetrics] = useState(null);
+  const [chartMetrics, setChartMetrics] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRealData = async () => {
+      // Fetch calculation summaries and historical plot metrics simultaneously
+      const [metricsRes, chartRes] = await Promise.all([
+        adminService.getPlatformOverviewMetrics(),
+        adminService.getPlatformChartMetrics()
+      ]);
+
+      if (metricsRes.success) {
+        setMetrics(metricsRes.data);
+      }
+      if (chartRes.success) {
+        setChartMetrics(chartRes.data);
+      }
+      
+      setLoading(false);
+    };
+
+    fetchRealData();
+  }, []);
+
+  // Helper function to handle clean price parsing
+  const formatCurrency = (val) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0
+    }).format(val || 0);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 space-y-3">
+        <Loader2 className="animate-spin text-emerald-600" size={32} />
+        <p className="text-sm font-semibold text-slate-500">Compiling real-time platform metrics...</p>
+      </div>
+    );
+  }
+
+  // Dynamic assignment of live values matching your structural cards array
+  const adminStats = [
+    { 
+      label: 'Total Platform AUM', 
+      value: formatCurrency(metrics?.totalAUM), 
+      change: '+12.5%', 
+      icon: Banknote, 
+      color: 'text-emerald-600', 
+      bg: 'bg-emerald-50' 
+    },
+    { 
+      label: 'Global Active Partners', 
+      value: metrics?.globalActivePartners?.toString() || '0', 
+      change: 'Live Users', 
+      icon: Users, 
+      color: 'text-blue-600', 
+      bg: 'bg-blue-50' 
+    },
+    { 
+      label: 'Platform Active Capital', 
+      value: formatCurrency(metrics?.totalActiveInvestments), 
+      change: 'In Trade', 
+      icon: TrendingUp, 
+      color: 'text-amber-600', 
+      bg: 'bg-amber-50' 
+    },
+  ];
+
+  // Calculate the total explicit balance allocated across standard investment sectors
+  const totalAllocated = (metrics?.stocksTotal || 0) + (metrics?.realEstateTotal || 0) + (metrics?.greenEnergyTotal || 0);
+
+  // Dynamically break down weight values using proportional sector metrics or fallbacks if empty
+  const globalAssetAllocation = totalAllocated > 0 ? [
+    { 
+      name: 'Stocks', 
+      amount: formatCurrency(metrics.stocksTotal), 
+      percentage: `${Math.round((metrics.stocksTotal / totalAllocated) * 100)}%`, 
+      color: 'bg-emerald-500' 
+    },
+    { 
+      name: 'Real Estate', 
+      amount: formatCurrency(metrics.realEstateTotal), 
+      percentage: `${Math.round((metrics.realEstateTotal / totalAllocated) * 100)}%`, 
+      color: 'bg-blue-500' 
+    },
+    { 
+      name: 'Green Energy', 
+      amount: formatCurrency(metrics.greenEnergyTotal), 
+      percentage: `${Math.round((metrics.greenEnergyTotal / totalAllocated) * 100)}%`, 
+      color: 'bg-amber-500' 
+    },
+  ] : [
+    // Standard visual fallback tracking configuration if database positions are empty
+    { name: 'Stocks', amount: formatCurrency((metrics?.totalAUM || 0) * 0.49), percentage: '49%', color: 'bg-emerald-500' },
+    { name: 'Real Estate', amount: formatCurrency((metrics?.totalAUM || 0) * 0.35), percentage: '35%', color: 'bg-blue-500' },
+    { name: 'Green Energy', amount: formatCurrency((metrics?.totalAUM || 0) * 0.16), percentage: '16%', color: 'bg-amber-500' },
+  ];
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -25,18 +127,6 @@ const AdminOverview = () => {
     hidden: { y: 20, opacity: 0 },
     visible: { y: 0, opacity: 1 }
   };
-
-  const adminStats = [
-    { label: 'Total Platform AUM', value: '$1,248,500', change: '+12.5%', icon: Banknote, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: 'Global Active Partners', value: '842', change: '+48 this week', icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: 'Platform ROI Paid', value: '$92,400', change: 'Stable', icon: TrendingUp, color: 'text-amber-600', bg: 'bg-amber-50' },
-  ];
-
-  const globalAssetAllocation = [
-    { name: 'Stocks', amount: '$612,000', percentage: '49%', color: 'bg-emerald-500' },
-    { name: 'Real Estate', amount: '$435,000', percentage: '35%', color: 'bg-blue-500' },
-    { name: 'Green Energy', amount: '$201,500', percentage: '16%', color: 'bg-amber-500' },
-  ];
 
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="p-4 md:pt-5 md:p-8 bg-slate-50 min-h-screen font-sans">
@@ -85,17 +175,16 @@ const AdminOverview = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
         {/* Platform Growth Chart */}
         <div className="lg:col-span-2">
-          <PerformanceChart title="Global Liquidity Growth (USD)" data={[1, 2, 3]} />
+          <PerformanceChart title="Global Liquidity Growth (USD)" data={chartMetrics} />
         </div>
 
         {/* Global Asset Distribution */}
         <motion.div variants={itemVariants}>
           <AssetDonut
             assets={globalAssetAllocation}
-            totalValue="$1.24M"
+            totalValue={formatCurrency(metrics?.totalAUM)}
           />
           <div className="mt-4 p-4 bg-emerald-900 rounded-2xl text-white">
             <p className="text-[10px] font-bold uppercase text-emerald-300 mb-1">Top Performing Sector</p>
@@ -105,7 +194,6 @@ const AdminOverview = () => {
             </div>
           </div>
         </motion.div>
-
       </div>
 
     </motion.div>

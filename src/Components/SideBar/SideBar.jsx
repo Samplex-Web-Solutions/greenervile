@@ -16,7 +16,8 @@ import {
   PlusCircle,
   Banknote,
   Menu,
-  X
+  X,
+  CheckSquare
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -41,10 +42,12 @@ const Sidebar = () => {
     ],
     admin: [
       { name: 'Admin Overview', path: '/panel', icon: ShieldCheck },
-      { name: 'Manage Users', path: '/panel/users', icon: Users },
+      { name: 'Create Users', path: '/panel/users', icon: Users },
+      { name: 'Approve Transactions', path: '/panel/reviews', icon: CheckSquare},
       { name: 'Add Funds', path: '/panel/addfunds', icon: Banknote },
+      { name: 'Deposit Settings', path: '/panel/deposit-settings', icon: Construction},
       { name: 'Market Settings', path: '/panel/market', icon: Construction },
-      { name: 'Transaction Logs', path: '/panel/history', icon: History },
+      { name: 'Add logs', path: '/panel/addhistory', icon: History },
       { name: 'System Settings', path: '/panel/settings', icon: Settings },
     ]
   };

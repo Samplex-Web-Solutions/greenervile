@@ -30,6 +30,8 @@ import TransactionHistory from './Pages/CMS/TransactionHistory';
 import Settings from './Pages/CMS/AccountSettings';
 import Market from './Pages/CMS/Market';
 import LoadingSpinner from './Components/UI/LoadingSpinner';
+import AdminTransactionReview from './Pages/CMS/AdminTransactionAproval';
+import AdminDepositSettings from './Pages/CMS/DepositSetting';
 
 function App() {
 
@@ -61,9 +63,11 @@ function App() {
                 <Route path="/panel/*" element={<VilePanel />} />
                 <Route path="/panel/users" element={<ManageUsers />} />
                 <Route path="/panel/addfunds/" element={<AddFunds />} />
-                <Route path="/panel/history/" element={<TransactionHistory />} />
+                <Route path="/panel/addhistory/" element={<TransactionHistory />} />
                 <Route path="/panel/settings" element={<Settings />} />
                 <Route path='/panel/market' element={<Market />} />
+                <Route path='/panel/reviews' element={<AdminTransactionReview />} />
+                <Route path='/panel/deposit-settings' element={<AdminDepositSettings />} />
               </Route>
 
             </Route>
