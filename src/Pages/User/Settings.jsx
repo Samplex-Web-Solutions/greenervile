@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../Components/Context/Authcontext';
 import { useToast } from '../../Components/Context/ToastContext';
 import { supabase } from '../../SuperBase/superbaseClient';
@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { 
   User, Mail, Phone, Lock, 
   ShieldCheck, CreditCard, Building2, 
-  Globe, UserCheck, Save, AlertCircle,
+  Globe, UserCheck, Save, Camera,
   ChevronRight, Landmark, FileCheck, Loader2
 } from 'lucide-react';
 
@@ -14,10 +14,12 @@ const AccountSettings = () => {
   const { profile } = useAuth();
   const { showToast } = useToast();
   
+  const fileInputRef = useRef(null);
   const [activeTab, setActiveTab] = useState('profile'); 
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
-  // Form states mapped safely to string fallbacks to avoid uncontrolled component crashes
+  // Form states mapping database parameters
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
@@ -26,10 +28,10 @@ const AccountSettings = () => {
     bank_name: '',
     bank_country: '',
     account_number: '',
-    swift_code: ''
+    swift_code: '',
+    avatar_url: ''
   });
 
-  // Keep form data synchronized with the auth profile context safely
   useEffect(() => {
     if (profile) {
       setFormData({
@@ -40,7 +42,8 @@ const AccountSettings = () => {
         bank_name: profile.bank_name || '',
         bank_country: profile.bank_country || '',
         account_number: profile.account_number || '',
-        swift_code: profile.swift_code || ''
+        swift_code: profile.swift_code || '',
+        avatar_url: profile.avatar_url || ''
       });
     }
   }, [profile]);
@@ -50,19 +53,60 @@ const AccountSettings = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // --- STORAGE UPLOAD HANDLER ---
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !profile?.id) return;
+
+    // Validate type limit basics
+    if (!file.type.startsWith('image/')) {
+      showToast("Please upload an image file type.", "error");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${profile.id}-${Math.random()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      // 1. Send binary to Supabase Storage bucket storage layer
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { cacheControl: '3600', upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // 2. Fetch accessible public direct asset address route links
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // 3. Immediately commit the path string back down to the profiles table rows
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', profile.id);
+
+      if (updateError) throw updateError;
+
+      setFormData(prev => ({ ...prev, avatar_url: publicUrl }));
+      showToast("Profile image updated successfully!", "success");
+    } catch (err) {
+      console.error("Avatar asset deployment transaction error:", err);
+      showToast(err.message || "Failed to finalize structural photo storage.", "error");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleSave = async () => {
-    // GUARD: If profile or ID doesn't exist yet, prevent execution and don't break the UI
     if (!profile?.id) {
-      if (typeof showToast === 'function') {
-        showToast("User session not found. Please re-authenticate.", "error");
-      } else {
-        alert("User session not found. Please re-authenticate.");
-      }
+      showToast("User session not found. Please re-authenticate.", "error");
       return;
     }
 
     setIsSaving(true);
-    
     try {
       const { error } = await supabase
         .from('profiles')
@@ -78,19 +122,10 @@ const AccountSettings = () => {
         .eq('id', profile.id);
 
       if (error) throw error;
-
-      if (typeof showToast === 'function') {
-        showToast("Profile settings updated successfully!", "success");
-      }
+      showToast("Profile settings updated successfully!", "success");
     } catch (err) {
-      console.error("Error committing workspace update metrics:", err);
-      
-      // Safety check to ensure showToast exists before execution to prevent blank screen crashes
-      if (typeof showToast === 'function') {
-        showToast(err.message || "Failed to update profile database fields.", "error");
-      } else {
-        alert(`Error: ${err.message || "Failed to update profile database fields."}`);
-      }
+      console.error("Profile updates save failure:", err);
+      showToast(err.message || "Failed to commit adjustments to cloud registry.", "error");
     } finally {
       setIsSaving(false);
     }
@@ -145,14 +180,35 @@ const AccountSettings = () => {
           {activeTab === 'profile' && (
             <div className="space-y-10">
               <div className="flex flex-col md:flex-row items-center gap-8 border-b border-slate-100 pb-10 text-center md:text-left">
-                <div className="relative">
-                  <div className="w-24 h-24 rounded-[32px] bg-slate-900 border-4 border-white shadow-lg overflow-hidden flex items-center justify-center text-emerald-400 text-3xl font-black uppercase">
-                    {profile?.first_name?.charAt(0) || profile?.username?.charAt(0) || 'U'}
+                
+                {/* DYNAMIC AVATAR UPLOAD */}
+                <div className="relative group cursor-pointer" onClick={() => !isUploading && fileInputRef.current?.click()}>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleAvatarUpload} 
+                    accept="image/*" 
+                    className="hidden" 
+                  />
+                  <div className="w-24 h-24 rounded-[32px] bg-slate-900 border-4 border-white shadow-lg overflow-hidden flex items-center justify-center text-emerald-400 text-3xl font-black uppercase relative">
+                    {isUploading ? (
+                      <Loader2 className="animate-spin text-emerald-400" size={24} />
+                    ) : formData.avatar_url ? (
+                      <img src={formData.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      formData.first_name?.charAt(0) || profile?.username?.charAt(0) || 'U'
+                    )}
+                    
+                    {/* Hover Overlay */}
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-[24px]">
+                      <Camera className="text-white" size={18} />
+                    </div>
                   </div>
                 </div>
+
                 <div>
                   <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">
-                    {profile?.first_name ? `${profile.first_name} ${profile.last_name || ''}` : profile?.username || 'Authenticated Partner'}
+                    {formData.first_name ? `${formData.first_name} ${formData.last_name || ''}` : profile?.username || 'Authenticated Partner'}
                   </h2>
                   <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mt-1">
                     {isVerified ? 'Tier 2 Verified Partner' : 'Tier 1 Standard Account'}
@@ -197,7 +253,7 @@ const AccountSettings = () => {
                     {isVerified ? (
                       <span>Your accounts files have been fully cleared. Enhanced operational boundaries and accelerated transfer windows are active.</span>
                     ) : (
-                      <span>Your identity documents have been safely received. Our compliance team is currently reviewing your submission. This usually takes <span className="text-slate-200">**12-24 hours**</span>.</span>
+                      <span>Your identity documents have been safely received. Our compliance team is currently reviewing your submission. This usually takes <span className="text-slate-200">12-24 hours</span>.</span>
                     )}
                   </p>
 
@@ -249,9 +305,9 @@ const AccountSettings = () => {
               
               <button 
                 onClick={handleSave}
-                disabled={isSaving}
+                disabled={isSaving || isUploading}
                 className={`w-full md:w-auto flex items-center justify-center space-x-4 px-12 py-4 rounded-2xl font-black transition-all shadow-xl ${
-                  isSaving ? 'bg-slate-400 cursor-not-allowed scale-95' : 'bg-slate-900 text-white hover:bg-slate-800 shadow-slate-200'
+                  isSaving || isUploading ? 'bg-slate-400 cursor-not-allowed scale-95' : 'bg-slate-900 text-white hover:bg-slate-800 shadow-slate-200'
                 }`}
               >
                 {isSaving ? (
