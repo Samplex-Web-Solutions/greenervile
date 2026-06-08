@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../Components/Context/Authcontext';
-import { supabase } from '../../SuperBase/superbaseClient';
+import { supabase } from '../../SuperBase/superbaseClient'; // Make sure this path points to your setup client
 import { motion } from 'framer-motion';
 import {
   Wallet, TrendingUp, ArrowUpRight,

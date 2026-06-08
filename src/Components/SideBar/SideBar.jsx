@@ -43,10 +43,11 @@ const Sidebar = () => {
     admin: [
       { name: 'Admin Overview', path: '/panel', icon: ShieldCheck },
       { name: 'Create Users', path: '/panel/users', icon: Users },
+      { name: 'Add logs', path: '/panel/addhistory', icon: History },
       { name: 'Approve Transactions', path: '/panel/reviews', icon: CheckSquare},
       { name: 'Deposit Settings', path: '/panel/deposit-settings', icon: Construction},
       { name: 'Market Settings', path: '/panel/market', icon: Construction },
-      { name: 'Add logs', path: '/panel/addhistory', icon: History },
+      {name: 'Investment Review', path: '/panel/investments', icon: History},
       { name: 'System Settings', path: '/panel/settings', icon: Settings },
     ]
   };

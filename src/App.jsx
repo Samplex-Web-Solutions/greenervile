@@ -31,6 +31,7 @@ import Market from './Pages/CMS/Market';
 import LoadingSpinner from './Components/UI/LoadingSpinner';
 import AdminTransactionReview from './Pages/CMS/AdminTransactionAproval';
 import AdminDepositSettings from './Pages/CMS/DepositSetting';
+import AdminInvestmentReview from './Pages/CMS/AdminInvestmentReview';
 
 function App() {
 
@@ -66,6 +67,7 @@ function App() {
                 <Route path='/panel/market' element={<Market />} />
                 <Route path='/panel/reviews' element={<AdminTransactionReview />} />
                 <Route path='/panel/deposit-settings' element={<AdminDepositSettings />} />
+                <Route path='/panel/investments' element={<AdminInvestmentReview />} />
               </Route>
 
             </Route>
