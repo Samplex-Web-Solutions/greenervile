@@ -1,28 +1,102 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../Components/Context/Authcontext';
 import { useToast } from '../../Components/Context/ToastContext';
+import { supabase } from '../../SuperBase/superbaseClient';
 import { motion } from 'framer-motion';
 import { 
   User, Mail, Phone, Lock, 
   ShieldCheck, CreditCard, Building2, 
-  Globe, Camera, Save, AlertCircle,
-  ChevronRight, KeyRound, Landmark,
-  FileCheck, Loader2
+  Globe, UserCheck, Save, AlertCircle,
+  ChevronRight, Landmark, FileCheck, Loader2
 } from 'lucide-react';
 
 const AccountSettings = () => {
   const { profile } = useAuth();
   const { showToast } = useToast();
-  const [activeTab, setActiveTab] = useState('profile '); // Defaulting to KYC for preview
+  
+  const [activeTab, setActiveTab] = useState('profile'); 
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleSave = () => {
-    setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
-      showToast("Profile settings updated successfully!", "success");
-    }, 1500);
+  // Form states mapped safely to string fallbacks to avoid uncontrolled component crashes
+  const [formData, setFormData] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+    bank_name: '',
+    bank_country: '',
+    account_number: '',
+    swift_code: ''
+  });
+
+  // Keep form data synchronized with the auth profile context safely
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        first_name: profile.first_name || '',
+        last_name: profile.last_name || '',
+        email: profile.email || '',
+        phone: profile.phone || '',
+        bank_name: profile.bank_name || '',
+        bank_country: profile.bank_country || '',
+        account_number: profile.account_number || '',
+        swift_code: profile.swift_code || ''
+      });
+    }
+  }, [profile]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
+
+  const handleSave = async () => {
+    // GUARD: If profile or ID doesn't exist yet, prevent execution and don't break the UI
+    if (!profile?.id) {
+      if (typeof showToast === 'function') {
+        showToast("User session not found. Please re-authenticate.", "error");
+      } else {
+        alert("User session not found. Please re-authenticate.");
+      }
+      return;
+    }
+
+    setIsSaving(true);
+    
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          phone: formData.phone,
+          bank_name: formData.bank_name,
+          bank_country: formData.bank_country,
+          account_number: formData.account_number,
+          swift_code: formData.swift_code,
+        })
+        .eq('id', profile.id);
+
+      if (error) throw error;
+
+      if (typeof showToast === 'function') {
+        showToast("Profile settings updated successfully!", "success");
+      }
+    } catch (err) {
+      console.error("Error committing workspace update metrics:", err);
+      
+      // Safety check to ensure showToast exists before execution to prevent blank screen crashes
+      if (typeof showToast === 'function') {
+        showToast(err.message || "Failed to update profile database fields.", "error");
+      } else {
+        alert(`Error: ${err.message || "Failed to update profile database fields."}`);
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const isVerified = profile?.verification_status === 'verified';
 
   return (
     <div className="p-4 md:p-8 lg:p-12 bg-slate-50 min-h-screen font-sans">
@@ -72,58 +146,69 @@ const AccountSettings = () => {
             <div className="space-y-10">
               <div className="flex flex-col md:flex-row items-center gap-8 border-b border-slate-100 pb-10 text-center md:text-left">
                 <div className="relative">
-                  <div className="w-24 h-24 rounded-[32px] bg-slate-900 border-4 border-white shadow-lg overflow-hidden flex items-center justify-center text-emerald-400 text-3xl font-black">
-                    {profile?.username?.charAt(0) || 'U'}
+                  <div className="w-24 h-24 rounded-[32px] bg-slate-900 border-4 border-white shadow-lg overflow-hidden flex items-center justify-center text-emerald-400 text-3xl font-black uppercase">
+                    {profile?.first_name?.charAt(0) || profile?.username?.charAt(0) || 'U'}
                   </div>
                 </div>
                 <div>
                   <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">
-                    {profile?.username || 'Authenticated User'}
+                    {profile?.first_name ? `${profile.first_name} ${profile.last_name || ''}` : profile?.username || 'Authenticated Partner'}
                   </h2>
-                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mt-1">Tier 1 Account</p>
+                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mt-1">
+                    {isVerified ? 'Tier 2 Verified Partner' : 'Tier 1 Standard Account'}
+                  </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-10">
-                <InputField label="First Name" placeholder="Enter first name" icon={User} />
-                <InputField label="Last Name" placeholder="Enter last name" icon={User} />
-                <InputField label="Email Address" placeholder="Email Address" icon={Mail} />
-                <InputField label="Phone Number" placeholder="+1 (000) 000-0000" icon={Phone} />
+                <InputField label="First Name" name="first_name" value={formData.first_name} onChange={handleChange} placeholder="First name" icon={User} />
+                <InputField label="Last Name" name="last_name" value={formData.last_name} onChange={handleChange} placeholder="Last name" icon={User} />
+                <InputField label="Email Address" name="email" value={formData.email} onChange={handleChange} placeholder="Email Address" icon={Mail} disabled={true} />
+                <InputField label="Phone Number" name="phone" value={formData.phone} onChange={handleChange} placeholder="e.g. +234 800 000 0000" icon={Phone} />
               </div>
             </div>
           )}
 
-          {/* VERIFICATION SECTION (ONLY SHOWING PROCESSING) */}
+          {/* VERIFICATION SECTION */}
           {activeTab === 'kyc' && (
             <div className="space-y-8">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">KYC Documents</h3>
-                <span className="bg-amber-50 text-amber-600 border border-amber-100 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">
-                  Processing
+                <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${isVerified ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
+                  {isVerified ? 'Approved' : 'Processing'}
                 </span>
               </div>
 
               <div className="p-8 md:p-16 bg-[#0F172A] rounded-[40px] text-center relative overflow-hidden shadow-2xl">
                 <div className="relative z-10 flex flex-col items-center">
-                  <div className="w-16 h-16 bg-amber-400/10 rounded-2xl flex items-center justify-center mb-8 border border-amber-400/20">
-                    <Loader2 className="text-amber-400 animate-spin" size={28} />
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-8 border ${isVerified ? 'bg-emerald-400/10 border-emerald-400/20' : 'bg-amber-400/10 border-amber-400/20'}`}>
+                    {isVerified ? (
+                      <UserCheck className="text-emerald-400" size={28} />
+                    ) : (
+                      <Loader2 className="text-amber-400 animate-spin" size={28} />
+                    )}
                   </div>
                   
                   <h3 className="text-white font-black uppercase tracking-[0.1em] text-xl md:text-2xl mb-4">
-                    Document Processing
+                    {isVerified ? 'Identity Confirmed' : 'Document Processing'}
                   </h3>
                   
                   <p className="text-slate-400 text-xs md:text-sm max-w-sm mx-auto leading-relaxed font-medium">
-                    Your identity documents have been safely received. Our compliance team is currently reviewing your submission. This usually takes <span className="text-slate-200">**12-24 hours**</span>.
+                    {isVerified ? (
+                      <span>Your accounts files have been fully cleared. Enhanced operational boundaries and accelerated transfer windows are active.</span>
+                    ) : (
+                      <span>Your identity documents have been safely received. Our compliance team is currently reviewing your submission. This usually takes <span className="text-slate-200">**12-24 hours**</span>.</span>
+                    )}
                   </p>
 
                   <div className="mt-10 flex items-center space-x-3 bg-white/5 px-5 py-2.5 rounded-full border border-white/10">
-                    <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                    <span className="text-amber-400 text-[9px] font-black uppercase tracking-[0.2em]">Upload Section Locked</span>
+                    <div className={`w-1.5 h-1.5 rounded-full ${isVerified ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
+                    <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${isVerified ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {isVerified ? 'Verification Complete' : 'Upload Section Locked'}
+                    </span>
                   </div>
                 </div>
 
-                {/* Abstract Background Icon */}
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-[0.03] pointer-events-none">
                   <FileCheck size={320} className="text-white" />
                 </div>
@@ -134,11 +219,11 @@ const AccountSettings = () => {
           {/* WITHDRAWAL SECTION */}
           {activeTab === 'withdrawal' && (
             <div className="space-y-10">
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-10">
-                <InputField label="Bank Name" placeholder="e.g. JPMorgan Chase" icon={Building2} />
-                <InputField label="Bank Country" placeholder="International Branch Location" icon={Landmark} />
-                <InputField label="IBAN / Account Number" placeholder="Global account format" icon={CreditCard} />
-                <InputField label="SWIFT / BIC Code" placeholder="8 or 11 characters" icon={Globe} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-10">
+                <InputField label="Bank Name" name="bank_name" value={formData.bank_name} onChange={handleChange} placeholder="e.g. JPMorgan Chase" icon={Building2} />
+                <InputField label="Bank Country" name="bank_country" value={formData.bank_country} onChange={handleChange} placeholder="International Branch Location" icon={Landmark} />
+                <InputField label="IBAN / Account Number" name="account_number" value={formData.account_number} onChange={handleChange} placeholder="Global account format" icon={CreditCard} />
+                <InputField label="SWIFT / BIC Code" name="swift_code" value={formData.swift_code} onChange={handleChange} placeholder="8 or 11 characters" icon={Globe} />
               </div>
             </div>
           )}
@@ -154,7 +239,7 @@ const AccountSettings = () => {
             </div>
           )}
 
-          {/* FOOTER ACTION (Hidden on KYC tab) */}
+          {/* FOOTER ACTION */}
           {activeTab !== 'kyc' && (
             <div className="mt-14 pt-10 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6">
               <div className="flex items-center space-x-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -186,7 +271,7 @@ const AccountSettings = () => {
   );
 };
 
-const InputField = ({ label, icon: Icon, type = "text", placeholder }) => (
+const InputField = ({ label, name, value, onChange, icon: Icon, type = "text", placeholder, disabled = false }) => (
   <div className="space-y-2.5">
     <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">{label}</label>
     <div className="relative group">
@@ -195,9 +280,17 @@ const InputField = ({ label, icon: Icon, type = "text", placeholder }) => (
       </div>
       <input 
         type={type}
+        name={name}
+        value={value || ''} 
+        onChange={onChange}
+        disabled={disabled}
         autoComplete="off"
         placeholder={placeholder}
-        className="w-full pl-14 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-[20px] text-sm font-bold text-slate-900 focus:bg-white focus:border-slate-100 focus:ring-[6px] focus:ring-slate-50 transition-all outline-none placeholder:text-slate-300 placeholder:font-medium"
+        className={`w-full pl-14 pr-6 py-4 border-2 border-transparent rounded-[20px] text-sm font-bold transition-all outline-none placeholder:text-slate-300 placeholder:font-medium ${
+          disabled 
+          ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+          : 'bg-slate-50 text-slate-900 focus:bg-white focus:border-slate-100 focus:ring-[6px] focus:ring-slate-50'
+        }`}
       />
     </div>
   </div>
