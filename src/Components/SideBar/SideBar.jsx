@@ -38,7 +38,6 @@ const Sidebar = () => {
       { name: 'Transactions', path: '/transaction', icon: History },
       { name: 'Withdraw', path: '/withdraw', icon: Banknote },
       { name: 'Settings', path: '/setting', icon: Settings },
-
     ],
     admin: [
       { name: 'Admin Overview', path: '/panel', icon: ShieldCheck },
@@ -47,7 +46,7 @@ const Sidebar = () => {
       { name: 'Approve Transactions', path: '/panel/reviews', icon: CheckSquare},
       { name: 'Deposit Settings', path: '/panel/deposit-settings', icon: Construction},
       { name: 'Market Settings', path: '/panel/market', icon: Construction },
-      {name: 'Investment Review', path: '/panel/investments', icon: History},
+      { name: 'Investment Review', path: '/panel/investments', icon: History},
       { name: 'System Settings', path: '/panel/settings', icon: Settings },
     ]
   };
@@ -57,7 +56,7 @@ const Sidebar = () => {
   return (
     <>
       {/* MOBILE HEADER BAR - Increased z-index to stay on top */}
-      <div className="lg:hidden  flex items-center py-8 justify-between p-4 bg-slate-900 text-white fixed top-0 left-0 right-0 z-[100] border-b border-slate-800">
+      <div className="lg:hidden flex items-center py-8 justify-between p-4 bg-slate-900 text-white fixed top-0 left-0 right-0 z-[100] border-b border-slate-800">
         <div className="flex items-center space-x-2">
           <img src={Logo} alt="Logo" className="w-8 h-8 object-contain" />
           <span className="font-black text-sm tracking-tight">Greener Vile</span>
@@ -120,7 +119,7 @@ const Sidebar = () => {
 };
 
 /* Extracted content to keep the code clean and ensure 
-  the mobile and desktop versions look identical.
+   the mobile and desktop versions look identical.
 */
 const SidebarContent = ({ Logo, setIsOpen, currentLinks, profile, handleLogout, isDesktop = false }) => (
   <>
@@ -171,9 +170,20 @@ const SidebarContent = ({ Logo, setIsOpen, currentLinks, profile, handleLogout, 
     {/* Profile & Logout Section */}
     <div className="p-4 bg-slate-950/40 border-t border-slate-800">
       <div className="flex items-center space-x-3 p-3 mb-4 bg-slate-900/50 rounded-2xl border border-slate-800">
-        <div className="w-9 h-9 rounded-full bg-emerald-600/20 border border-emerald-500/50 flex items-center justify-center font-bold text-emerald-500 uppercase flex-shrink-0">
-          {profile?.first_name?.[0]}
+        
+        {/* DYNAMIC AVATAR WRAPPER */}
+        <div className="w-9 h-9 rounded-full overflow-hidden bg-emerald-600/20 border border-emerald-500/50 flex items-center justify-center font-bold text-emerald-500 uppercase flex-shrink-0">
+          {profile?.avatar_url ? (
+            <img 
+              src={profile.avatar_url} 
+              alt="User Avatar" 
+              className="w-full h-full object-cover" 
+            />
+          ) : (
+            profile?.first_name?.[0] || profile?.username?.[0] || 'U'
+          )}
         </div>
+
         <div className="flex-1 min-w-0">
           <p className="text-xs font-bold text-white truncate leading-none mb-1">
             {profile?.first_name} {profile?.last_name}

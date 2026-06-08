@@ -64,20 +64,18 @@ const AccountSettings = () => {
       return;
     }
 
-    setIsUploading(true);
+  setIsUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${profile.id}-${Math.random()}.${fileExt}`;
-      const filePath = `${fileName}`;
+      const filePath = `${profile.id}/avatar-${Date.now()}.${fileExt}`;
 
-      // 1. Send binary to Supabase Storage bucket storage layer
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, file, { cacheControl: '3600', upsert: true });
 
       if (uploadError) throw uploadError;
 
-      // 2. Fetch accessible public direct asset address route links
+      // 2. Fetch accessible public direct asset link
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath);
@@ -92,7 +90,8 @@ const AccountSettings = () => {
 
       setFormData(prev => ({ ...prev, avatar_url: publicUrl }));
       showToast("Profile image updated successfully!", "success");
-    } catch (err) {
+    } 
+    catch (err) {
       console.error("Avatar asset deployment transaction error:", err);
       showToast(err.message || "Failed to finalize structural photo storage.", "error");
     } finally {
@@ -100,32 +99,43 @@ const AccountSettings = () => {
     }
   };
 
-  const handleSave = async () => {
+ const handleSave = async () => {
     if (!profile?.id) {
       showToast("User session not found. Please re-authenticate.", "error");
       return;
     }
 
+    // 🔬 OPEN YOUR BROWSER CONSOLE (F12) AND CHECK THIS LOG:
+    console.log("REACT APP USER ID:", profile.id);
+
     setIsSaving(true);
     try {
-      const { error } = await supabase
+      const updatePayload = {
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        phone: formData.phone,
+        bank_name: formData.bank_name,
+        bank_country: formData.bank_country,
+        account_number: formData.account_number,
+        swift_code: formData.swift_code,
+      };
+
+      const { data, error } = await supabase
         .from('profiles')
-        .update({
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          phone: formData.phone,
-          bank_name: formData.bank_name,
-          bank_country: formData.bank_country,
-          account_number: formData.account_number,
-          swift_code: formData.swift_code,
-        })
-        .eq('id', profile.id);
+        .update(updatePayload)
+        .eq('id', profile.id) // 👈 This ID string must exactly match your row's id column
+        .select();
 
       if (error) throw error;
+
+      if (data && data.length > 0) {
+        setFormData(prev => ({ ...prev, ...data[0] }));
+      }
+
       showToast("Profile settings updated successfully!", "success");
     } catch (err) {
-      console.error("Profile updates save failure:", err);
-      showToast(err.message || "Failed to commit adjustments to cloud registry.", "error");
+      console.error("Database save error details:", err);
+      showToast(err.message || "Failed to save profile changes.", "error");
     } finally {
       setIsSaving(false);
     }
